@@ -15,29 +15,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Job 1: download the data and package the site.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build site folder
+        run: |
+          mkdir -p site
+          cp index.html site/
+
+      - name: Download latest BUFKIT files
+        env:
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: python3 scripts/fetch_bufkit.py site/data
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Job 2: publish it. Kept in a separate job because deploy-pages, run in the
+  # same job right after the upload, can't see the artifact yet (GitHub bug,
+  # Nov 2026). If only this job fails, use "Re-run failed jobs": it reuses the
+  # upload from job 1 instead of uploading a second copy.
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build site folder
-        run: |
-          mkdir -p site
-          cp index.html site/
-          
-      - name: Download latest BUFKIT files
-        env:
-          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-        run: python3 scripts/fetch_bufkit.py site/data
-        
-      - uses: actions/configure-pages@v5
-      
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-          
       - id: deployment
         uses: actions/deploy-pages@v4
