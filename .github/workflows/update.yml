@@ -1,1 +1,43 @@
+name: Update BUFKIT data and deploy
 
+on:
+  workflow_dispatch:          # Lets cron-job.org (and you) trigger it.
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build site folder
+        run: |
+          mkdir -p site
+          cp index.html site/
+          
+      - name: Download latest BUFKIT files
+        env:
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: python3 scripts/fetch_bufkit.py site/data
+        
+      - uses: actions/configure-pages@v5
+      
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+          
+      - id: deployment
+        uses: actions/deploy-pages@v4
